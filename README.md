@@ -4,7 +4,7 @@ No ar: https://agenda-atl.vercel.app
 
 Página para agendar compromissos pelo iPhone: por voz, foto/print, PDF, texto colado (e-mail, WhatsApp) ou preenchendo na mão.
 A IA lê a data e o horário, você confere e um toque salva no Calendário do iPhone com dois avisos:
-**às 8h do dia** e **1 hora antes** (regras em `lib/ics.ts`).
+**às 8h do dia**, **1 hora antes** e **na hora** (regras em `lib/ics.ts`).
 
 ## Configuração na Vercel (Settings → Environment Variables)
 

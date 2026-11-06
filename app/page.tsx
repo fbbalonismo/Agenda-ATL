@@ -388,6 +388,9 @@ export default function Pagina() {
             <span className="selo selo-sino">
               <Sino className="selo-ico" /> 1 hora antes
             </span>
+            <span className="selo selo-sino">
+              <Sino className="selo-ico" /> na hora
+            </span>
           </div>
         </div>
       </header>

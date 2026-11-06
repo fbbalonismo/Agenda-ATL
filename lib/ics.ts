@@ -16,7 +16,7 @@ export type Compromisso = {
 
 export type Aviso = { minutosAntes: number; rotulo: string };
 
-/** Avisos do compromisso: 1 hora antes e às 8h do dia (quando fizer sentido). */
+/** Avisos do compromisso: às 8h do dia (quando fizer sentido), 1 hora antes e na hora. */
 export function calcularAvisos(hora: string): Aviso[] {
   const [h, m] = hora.split(":").map(Number);
   const inicioMin = h * 60 + m;
@@ -31,6 +31,7 @@ export function calcularAvisos(hora: string): Aviso[] {
   if (manha > 0 && manha !== MINUTOS_ANTES) {
     avisos.unshift({ minutosAntes: manha, rotulo: `${fmtHora(HORA_AVISO_MANHA * 60)} (manhã do dia)` });
   }
+  avisos.push({ minutosAntes: 0, rotulo: `${fmtHora(inicioMin)} (na hora)` });
   return avisos;
 }
 
@@ -118,7 +119,7 @@ export function gerarIcs(c: Compromisso, agora = new Date()): string {
       "BEGIN:VALARM",
       "ACTION:DISPLAY",
       `DESCRIPTION:${escapar(titulo)}`,
-      `TRIGGER:-PT${aviso.minutosAntes}M`,
+      aviso.minutosAntes === 0 ? "TRIGGER:PT0S" : `TRIGGER:-PT${aviso.minutosAntes}M`,
       "END:VALARM",
     );
   }

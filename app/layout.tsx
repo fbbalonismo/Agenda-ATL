@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Agenda Alertas",
-  description: "Agende compromissos por voz, foto, PDF ou toque, com aviso às 8h e 1 hora antes.",
+  description: "Agende compromissos por voz, foto, PDF ou toque, com aviso às 8h, 1 hora antes e na hora.",
   appleWebApp: { capable: true, title: "Agenda", statusBarStyle: "default" },
 };
 
