@@ -120,6 +120,16 @@ export default function Pagina() {
     setSenha(s);
     const w = window as JanelaComVoz;
     setVozDisponivel(Boolean(w.SpeechRecognition || w.webkitSpeechRecognition));
+
+    // Pedido vindo da Siri (Atalho abre /?texto=...): lê na hora.
+    const pedido = new URLSearchParams(window.location.search).get("texto")?.trim();
+    if (pedido) {
+      window.history.replaceState(null, "", window.location.pathname);
+      setTexto(pedido);
+      lerTexto(pedido);
+    }
+    // roda só uma vez, ao abrir a página
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const problema = validar({ titulo: item.titulo, data: item.data, hora: item.hora });
@@ -587,6 +597,32 @@ export default function Pagina() {
           </>
         )}
       </section>
+
+      <details className="cartao siri">
+        <summary>
+          <Microfone className="titulo-ico-esq" /> Agendar falando com a Siri
+        </summary>
+        <ol>
+          <li>
+            Abra o app <b>Atalhos</b> e toque em <b>+</b>. Dê o nome <b>Agendar ATL</b>.
+          </li>
+          <li>
+            Adicione a ação <b>Ditar Texto</b> (idioma: Português do Brasil).
+          </li>
+          <li>
+            Adicione <b>Codificar URL</b> (fica com o “Texto Ditado”).
+          </li>
+          <li>
+            Adicione <b>Abrir URLs</b> e escreva: <code>https://agenda-atl.vercel.app/?texto=</code> e, logo depois, coloque a variável{" "}
+            <b>Texto Codificado em URL</b>.
+          </li>
+          <li>
+            Pronto. Diga: <b>“E aí Siri, Agendar ATL”</b> e fale o compromisso. O app abre, lê e você só confere e toca em{" "}
+            <b>Adicionar ao Calendário</b>.
+          </li>
+        </ol>
+        <p className="dica">Funciona igual no Mac (app Atalhos + Siri).</p>
+      </details>
 
       <footer className="rodape">Horários de Brasília · Confira sempre a data antes de salvar.</footer>
     </main>
