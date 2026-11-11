@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { calcularAvisos, validar } from "@/lib/ics";
 import { Arquivos, CalendarioOk, Festa, Hero, Lapis, Lupa, Microfone, Sino, Sol, Vazio } from "@/components/Ilustracoes";
+import AgendaAno from "@/components/AgendaAno";
+import type { Compromisso } from "@/lib/agenda";
 
 type Item = { titulo: string; data: string; hora: string; local: string; observacao: string };
 type Corpo = { texto?: string; arquivo?: { tipo: string; base64: string } };
 
 const VAZIO: Item = { titulo: "", data: "", hora: "", local: "", observacao: "" };
 const CHAVE_SENHA = "agenda-senha";
+const CHAVE_ANO = "agenda-ano-v1";
 const PDF_MAX = 3 * 1024 * 1024;
 const MAX_ARQUIVOS = 5;
 
@@ -36,6 +39,21 @@ function gravarSenha(s: string) {
   try {
     if (s) localStorage.setItem(CHAVE_SENHA, s);
     else localStorage.removeItem(CHAVE_SENHA);
+  } catch {}
+}
+
+// A agenda do ano fica guardada neste aparelho (o Calendário do iPhone continua sendo onde os avisos tocam).
+function lerAno(): Compromisso[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(CHAVE_ANO) || "[]");
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+function gravarAno(l: Compromisso[]) {
+  try {
+    localStorage.setItem(CHAVE_ANO, JSON.stringify(l));
   } catch {}
 }
 
@@ -107,6 +125,8 @@ export default function Pagina() {
   const [salvos, setSalvos] = useState<Item[]>([]);
   const [item, setItem] = useState<Item>(VAZIO);
   const [adicionado, setAdicionado] = useState(false);
+  const [verAno, setVerAno] = useState(false);
+  const [anoLista, setAnoLista] = useState<Compromisso[]>([]);
   const reconhecimento = useRef<Reconhecimento | null>(null);
   const textoFalado = useRef("");
   const pendente = useRef<null | (() => void)>(null);
@@ -115,6 +135,8 @@ export default function Pagina() {
   const contadorArraste = useRef(0);
 
   useEffect(() => {
+    setAnoLista(lerAno());
+    if (new URLSearchParams(window.location.search).get("ver") === "ano") setVerAno(true);
     const s = lerSenha();
     senhaRef.current = s;
     setSenha(s);
@@ -332,9 +354,18 @@ export default function Pagina() {
     acao?.();
   }
 
+  function mudarAno(l: Compromisso[]) {
+    setAnoLista(l);
+    gravarAno(l);
+  }
+
   function salvar() {
     setAdicionado(true);
     setSalvos((s) => (s.some((x) => mesmo(x, item)) ? s : [...s, item]));
+    // Tudo o que vai para o Calendário do iPhone também entra no "Meu ano"
+    const atual = lerAno();
+    if (!atual.some((c) => c.titulo === item.titulo && c.data === item.data && c.hora === item.hora))
+      mudarAno([...atual, { id: Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4), titulo: item.titulo, data: item.data, hora: item.hora, local: item.local, observacao: item.observacao, repetir: "" }]);
   }
 
   function proximo() {
@@ -365,6 +396,18 @@ export default function Pagina() {
   const temDados = Boolean(item.titulo || item.data || item.hora);
   const faltam = achados.filter((a) => !salvos.some((s) => mesmo(s, a)) && !mesmo(a, item)).length;
 
+  if (verAno)
+    return (
+      <AgendaAno
+        lista={anoLista}
+        aoMudar={mudarAno}
+        aoVoltar={() => {
+          setVerAno(false);
+          window.scrollTo({ top: 0 });
+        }}
+      />
+    );
+
   return (
     <main className="app">
       {arrastando && (
@@ -392,6 +435,9 @@ export default function Pagina() {
               <Sino className="selo-ico" /> na hora
             </span>
           </div>
+          <button type="button" className="secundario ver-ano" onClick={() => setVerAno(true)}>
+            📅 Meu ano{anoLista.length ? ` · ${anoLista.length}` : ""}
+          </button>
         </div>
       </header>
 
