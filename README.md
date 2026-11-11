@@ -14,6 +14,18 @@ Toque no dia para anotar compromisso e observações, ou escreva/fale “anivers
 (leitura da frase sem IA, em `lib/agenda.ts`). Aniversário repete todo ano. Tudo o que é salvo no Calendário do iPhone também entra aqui.
 Os compromissos do “Meu ano” ficam guardados **neste aparelho** (localStorage, chave `agenda-ano-v1`). Abrir direto: `/?ver=ano`.
 
+## Agenda junto com o app de viagens
+
+Os compromissos do “Meu ano” ficam no mesmo banco do app Agente de Viagens (Upstash Redis `viagens-db`, chave `agente-viagens:state`):
+o que é marcado em um aparece no outro, e as viagens e reservas aparecem aqui (só leitura). Rota: `/api/agenda` (protegida pela `APP_SENHA`).
+Para ligar: na Vercel, conectar o banco `viagens-db` também a este projeto (Storage → viagens-db → Connect Project). Sem o banco,
+o “Meu ano” funciona só no aparelho. Regras de mescla no app de viagens: `lib/eventsync.js` de lá.
+
+## Semana
+
+`/?ver=semana` mostra de segunda a domingo. `/api/semana` baixa um evento que repete toda segunda às 8h no Calendário do iPhone,
+com aviso na tela e link para a semana.
+
 ## Configuração na Vercel (Settings → Environment Variables)
 
 - `ANTHROPIC_API_KEY` — chave da API da Anthropic (console.anthropic.com), usada para ler arquivos e textos.

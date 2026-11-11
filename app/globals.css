@@ -340,3 +340,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .ano-botoes { display: flex; gap: 8px; }
 .ano-botoes > * { flex: 1; padding: 13px; border-radius: 14px; font-weight: 800; cursor: pointer; }
 .ano-apagar { background: transparent; color: var(--erro); border: 2px solid var(--erro); }
+.ver-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.lembrete-semana { color: var(--azul); font-weight: 700; font-size: 0.92rem; }
+.ano-sub { color: var(--muted); font-weight: 700; width: 100%; }
+.ano-faixa { margin: 8px 12px 0; padding: 12px 14px; border-radius: 14px; background: var(--sol-soft); color: var(--alerta); font-size: 0.9rem; display: flex; flex-direction: column; gap: 8px; }
+.ano-faixa.erro { background: var(--erro-soft); color: var(--erro); }
+.ano-viagem { display: block; border-radius: 10px; padding: 4px 9px; background: var(--azul-soft); color: var(--fg); font-size: 0.85rem; line-height: 1.3; }
+.ano-viagem.inicio { background: var(--azul); color: var(--no-azul); font-weight: 800; }
+.ano-viagem.pendente { background: var(--sol-soft); color: var(--alerta); }
+.ano-viagem em { font-style: normal; font-weight: 800; margin-right: 6px; }
+.ano-viagem small { display: block; font-size: 0.74rem; opacity: 0.75; }

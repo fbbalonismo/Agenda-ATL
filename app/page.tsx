@@ -5,6 +5,7 @@ import { calcularAvisos, validar } from "@/lib/ics";
 import { Arquivos, CalendarioOk, Festa, Hero, Lapis, Lupa, Microfone, Sino, Sol, Vazio } from "@/components/Ilustracoes";
 import AgendaAno from "@/components/AgendaAno";
 import type { Compromisso } from "@/lib/agenda";
+import type { ItemViagem } from "@/lib/sync";
 
 type Item = { titulo: string; data: string; hora: string; local: string; observacao: string };
 type Corpo = { texto?: string; arquivo?: { tipo: string; base64: string } };
@@ -125,8 +126,11 @@ export default function Pagina() {
   const [salvos, setSalvos] = useState<Item[]>([]);
   const [item, setItem] = useState<Item>(VAZIO);
   const [adicionado, setAdicionado] = useState(false);
-  const [verAno, setVerAno] = useState(false);
+  const [verAno, setVerAno] = useState<false | "ano" | "semana">(false);
   const [anoLista, setAnoLista] = useState<Compromisso[]>([]);
+  const [viagens, setViagens] = useState<ItemViagem[]>([]);
+  const [sinc, setSinc] = useState<"local" | "ligado" | "senha" | "erro">("local");
+  const [senhaAno, setSenhaAno] = useState("");
   const reconhecimento = useRef<Reconhecimento | null>(null);
   const textoFalado = useRef("");
   const pendente = useRef<null | (() => void)>(null);
@@ -136,9 +140,11 @@ export default function Pagina() {
 
   useEffect(() => {
     setAnoLista(lerAno());
-    if (new URLSearchParams(window.location.search).get("ver") === "ano") setVerAno(true);
+    const ver = new URLSearchParams(window.location.search).get("ver");
+    if (ver === "ano" || ver === "semana") setVerAno(ver);
     const s = lerSenha();
     senhaRef.current = s;
+    carregarAgenda(s);
     setSenha(s);
     const w = window as JanelaComVoz;
     setVozDisponivel(Boolean(w.SpeechRecognition || w.webkitSpeechRecognition));
@@ -359,13 +365,63 @@ export default function Pagina() {
     gravarAno(l);
   }
 
+  // ---------- Agenda compartilhada com o app de viagens ----------
+  async function chamarAgenda(metodo: "GET" | "POST", corpo?: unknown, s = senhaRef.current) {
+    const r = await fetch("/api/agenda", {
+      method: metodo,
+      headers: { "Content-Type": "application/json", "x-senha": s },
+      body: corpo ? JSON.stringify(corpo) : undefined,
+      cache: "no-store",
+    });
+    const d = await r.json().catch(() => ({}));
+    return { r, d };
+  }
+  function aplicar(d: { lista?: Compromisso[]; viagens?: ItemViagem[] }) {
+    if (d.lista) mudarAno(d.lista);
+    if (d.viagens) setViagens(d.viagens);
+  }
+  async function carregarAgenda(s = senhaRef.current) {
+    try {
+      const { r, d } = await chamarAgenda("GET", undefined, s);
+      if (d.ligado === false) return setSinc("local");
+      if (r.status === 401) return setSinc("senha");
+      if (!r.ok) return setSinc("erro");
+      // Compromissos marcados só neste aparelho antes da integração sobem para o banco compartilhado
+      const locais = lerAno().filter((c) => !(d.lista as Compromisso[]).some((x) => x.id === c.id));
+      if (locais.length) {
+        const imp = await chamarAgenda("POST", { op: "importar", varios: locais }, s);
+        if (imp.r.ok) return (aplicar(imp.d), setSinc("ligado"));
+      }
+      aplicar(d);
+      setSinc("ligado");
+    } catch {
+      setSinc("erro");
+    }
+  }
+  async function salvarComp(c: Compromisso) {
+    const atual = lerAno();
+    mudarAno(atual.some((x) => x.id === c.id) ? atual.map((x) => (x.id === c.id ? c : x)) : [...atual, c]);
+    if (sinc !== "ligado") return;
+    try {
+      const { r, d } = await chamarAgenda("POST", { op: "salvar", c });
+      if (r.ok) aplicar(d); else setSinc(r.status === 401 ? "senha" : "erro");
+    } catch { setSinc("erro"); }
+  }
+  async function apagarComp(id: string) {
+    mudarAno(lerAno().filter((x) => x.id !== id));
+    if (sinc !== "ligado") return;
+    try {
+      const { r, d } = await chamarAgenda("POST", { op: "apagar", id });
+      if (r.ok) aplicar(d); else setSinc(r.status === 401 ? "senha" : "erro");
+    } catch { setSinc("erro"); }
+  }
+
   function salvar() {
     setAdicionado(true);
     setSalvos((s) => (s.some((x) => mesmo(x, item)) ? s : [...s, item]));
-    // Tudo o que vai para o Calendário do iPhone também entra no "Meu ano"
-    const atual = lerAno();
-    if (!atual.some((c) => c.titulo === item.titulo && c.data === item.data && c.hora === item.hora))
-      mudarAno([...atual, { id: Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4), titulo: item.titulo, data: item.data, hora: item.hora, local: item.local, observacao: item.observacao, repetir: "" }]);
+    // Tudo o que vai para o Calendário do iPhone também entra no "Meu ano" (e no app de viagens)
+    if (!lerAno().some((c) => c.titulo === item.titulo && c.data === item.data && c.hora === item.hora))
+      salvarComp({ id: Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4), titulo: item.titulo, data: item.data, hora: item.hora, local: item.local, observacao: item.observacao, repetir: "" });
   }
 
   function proximo() {
@@ -396,17 +452,38 @@ export default function Pagina() {
   const temDados = Boolean(item.titulo || item.data || item.hora);
   const faltam = achados.filter((a) => !salvos.some((s) => mesmo(s, a)) && !mesmo(a, item)).length;
 
-  if (verAno)
+  if (verAno) {
+    const faixa =
+      sinc === "senha" ? (
+        <div className="ano-faixa">
+          <span>Digite a senha do app para juntar com a agenda do app de viagens:</span>
+          <div className="ano-linha">
+            <input type="password" value={senhaAno} onChange={(e) => setSenhaAno(e.target.value)} autoComplete="current-password" aria-label="Senha do app" />
+            <button type="button" className="principal ano-marcar" onClick={() => { gravarSenha(senhaAno.trim()); senhaRef.current = senhaAno.trim(); setSenha(senhaAno.trim()); setSenhaAno(""); carregarAgenda(senhaAno.trim()); }}>Entrar</button>
+          </div>
+        </div>
+      ) : sinc === "erro" ? (
+        <div className="ano-faixa erro">Sem conexão com a agenda compartilhada. O que marcar agora fica neste aparelho. <button type="button" className="ano-link" onClick={() => carregarAgenda()}>Tentar de novo</button></div>
+      ) : sinc === "local" ? (
+        <div className="ano-faixa">Agenda só deste aparelho: a ligação com o app de viagens ainda não foi ativada na Vercel.</div>
+      ) : null;
     return (
       <AgendaAno
         lista={anoLista}
-        aoMudar={mudarAno}
+        viagens={viagens}
+        aoSalvar={salvarComp}
+        aoApagar={apagarComp}
+        semana={verAno === "semana"}
+        aoVerAno={() => setVerAno("ano")}
+        faixa={faixa}
         aoVoltar={() => {
           setVerAno(false);
+          window.history.replaceState(null, "", window.location.pathname);
           window.scrollTo({ top: 0 });
         }}
       />
     );
+  }
 
   return (
     <main className="app">
@@ -435,9 +512,15 @@ export default function Pagina() {
               <Sino className="selo-ico" /> na hora
             </span>
           </div>
-          <button type="button" className="secundario ver-ano" onClick={() => setVerAno(true)}>
-            📅 Meu ano{anoLista.length ? ` · ${anoLista.length}` : ""}
-          </button>
+          <div className="ver-botoes">
+            <button type="button" className="secundario ver-ano" onClick={() => setVerAno("ano")}>
+              📅 Meu ano{anoLista.length ? ` · ${anoLista.length}` : ""}
+            </button>
+            <button type="button" className="secundario ver-ano" onClick={() => setVerAno("semana")}>
+              🗓️ Semana
+            </button>
+          </div>
+          <a className="lembrete-semana" href="/api/semana">🔔 Mostrar a semana toda segunda às 8h</a>
         </div>
       </header>
 

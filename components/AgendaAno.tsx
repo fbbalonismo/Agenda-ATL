@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CORES_MES, DIAS_SEMANA, MESES, diaDaSemana, diasDoAno, feriados, hojeEmBrasilia, lerFrase, porDia, type Compromisso } from "@/lib/agenda";
+import type { ItemViagem } from "@/lib/sync";
+
+const ICONE: Record<string, string> = { viagem: "🧳", voo: "✈️", hospedagem: "🏨", transporte: "🚆", carro: "🚗", passeio: "🎟️", restaurante: "🍽️", outro: "📌" };
 
 type Reconhecimento = {
   lang: string;
@@ -23,7 +26,18 @@ const extenso = (data: string, opcoes: Intl.DateTimeFormatOptions) => {
 const linkIcs = (c: Compromisso) =>
   `/api/ics?${new URLSearchParams({ titulo: c.titulo, data: c.data, hora: c.hora || "09:00", local: c.local, notas: c.observacao }).toString()}`;
 
-export default function AgendaAno({ lista, aoMudar, aoVoltar }: { lista: Compromisso[]; aoMudar: (l: Compromisso[]) => void; aoVoltar: () => void }) {
+type Props = {
+  lista: Compromisso[];
+  viagens: ItemViagem[];
+  aoSalvar: (c: Compromisso) => void;
+  aoApagar: (id: string) => void;
+  aoVoltar: () => void;
+  semana?: boolean;
+  aoVerAno?: () => void;
+  faixa?: React.ReactNode;
+};
+
+export default function AgendaAno({ lista, viagens, aoSalvar, aoApagar, aoVoltar, semana, aoVerAno, faixa }: Props) {
   const hoje = hojeEmBrasilia();
   const [ano, setAno] = useState(+hoje.slice(0, 4));
   const [frase, setFrase] = useState("");
@@ -53,7 +67,7 @@ export default function AgendaAno({ lista, aoMudar, aoVoltar }: { lista: Comprom
       setRecado({ ok: false, texto: 'Não achei a data. Fale junto, por exemplo: "aniversário André 20 de outubro".' });
       return;
     }
-    aoMudar([...lista, { id: novoId(), titulo: p.titulo, data: p.data, hora: p.hora, local: "", observacao: "", repetir: p.repetir }]);
+    aoSalvar({ id: novoId(), titulo: p.titulo, data: p.data, hora: p.hora, local: "", observacao: "", repetir: p.repetir });
     setRecado({ ok: true, texto: `Marcado: ${p.titulo} · ${extenso(p.data, { weekday: "short", day: "numeric", month: "long", year: "numeric" })}${p.hora ? " às " + p.hora : ""}${p.repetir ? " · todo ano" : ""}` });
     setFrase("");
     if (!p.repetir && +p.data.slice(0, 4) !== ano) setAno(+p.data.slice(0, 4));
@@ -88,21 +102,35 @@ export default function AgendaAno({ lista, aoMudar, aoVoltar }: { lista: Comprom
   }
 
   function salvar(c: Compromisso) {
-    aoMudar(lista.some((x) => x.id === c.id) ? lista.map((x) => (x.id === c.id ? c : x)) : [...lista, c]);
+    aoSalvar(c);
     setEditando(null);
   }
+  const viagensDoDia: Record<string, ItemViagem[]> = {};
+  for (const v of viagens) (viagensDoDia[v.data] ||= []).push(v);
+  for (const k of Object.keys(viagensDoDia)) viagensDoDia[k].sort((x, y) => (x.tipo === "viagem" ? -1 : y.tipo === "viagem" ? 1 : (x.hora || "99").localeCompare(y.hora || "99")));
+  // Semana: de segunda a domingo da semana atual
+  const seg = (() => { const [a, m, d] = hoje.split("-").map(Number); const x = new Date(a, m - 1, d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; })();
+  const diasSemana = Array.from({ length: 7 }, (_, i) => { const x = new Date(seg); x.setDate(x.getDate() + i); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; });
+  const dias = semana ? diasSemana : diasDoAno(ano);
+  const ferSemana = semana ? { ...feriados(+diasSemana[0].slice(0, 4)), ...feriados(+diasSemana[6].slice(0, 4)) } : null;
+  const doDiaSemana = semana ? { ...porDia(lista, +diasSemana[0].slice(0, 4)), ...porDia(lista, +diasSemana[6].slice(0, 4)) } : null;
 
   return (
     <div className="ano">
       <header className="ano-topo">
         <button type="button" className="ano-btn" onClick={aoVoltar} aria-label="Voltar">←</button>
-        <h1>Meu ano</h1>
+        <h1>{semana ? "Sua semana" : "Meu ano"}</h1>
+        {semana ? (
+          <button type="button" className="ano-link" onClick={aoVerAno}>Ver o ano</button>
+        ) : (
         <div className="ano-sel">
           <button type="button" className="ano-btn" onClick={() => setAno((a) => a - 1)} aria-label="Ano anterior">‹</button>
           <b>{ano}</b>
           <button type="button" className="ano-btn" onClick={() => setAno((a) => a + 1)} aria-label="Próximo ano">›</button>
         </div>
+        )}
       </header>
+      {faixa}
 
       <div className="ano-barra">
         <div className="ano-linha">
@@ -125,7 +153,8 @@ export default function AgendaAno({ lista, aoMudar, aoVoltar }: { lista: Comprom
         </div>
         <div className="ano-linha2">
           {recado && <span className={recado.ok ? "ano-ok" : "ano-erro"}>{recado.texto}</span>}
-          {ano === +hoje.slice(0, 4) && (
+          {semana && <span className="ano-sub">{extenso(diasSemana[0], { day: "numeric", month: "long" })} a {extenso(diasSemana[6], { day: "numeric", month: "long" })}</span>}
+          {!semana && ano === +hoje.slice(0, 4) && (
             <button type="button" className="ano-link" onClick={() => refHoje.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
               Ir para hoje
             </button>
@@ -134,19 +163,20 @@ export default function AgendaAno({ lista, aoMudar, aoVoltar }: { lista: Comprom
       </div>
 
       <div className="ano-lista">
-        {diasDoAno(ano).map((dia) => {
+        {dias.map((dia) => {
           const mes = +dia.slice(5, 7) - 1;
           const n = +dia.slice(8, 10);
           const sem = diaDaSemana(dia);
           const fds = sem === 0 || sem === 6;
-          const feriado = fer[dia];
-          const itens = doDia[dia] || [];
+          const feriado = (ferSemana || fer)[dia];
+          const itens = (doDiaSemana || doDia)[dia] || [];
+          const vgs = viagensDoDia[dia] || [];
           const abrir = () => setEditando({ id: novoId(), titulo: "", data: dia, hora: "", local: "", observacao: "", repetir: "" });
           return (
             <div key={dia} ref={dia === hoje ? refHoje : null} className="ano-bloco">
-              {n === 1 && (
+              {(n === 1 || (semana && dia === dias[0])) && (
                 <div className="ano-mes" style={{ background: CORES_MES[mes] }}>
-                  {MESES[mes]} {ano}
+                  {MESES[mes]} {dia.slice(0, 4)}
                 </div>
               )}
               <div
@@ -161,6 +191,13 @@ export default function AgendaAno({ lista, aoMudar, aoVoltar }: { lista: Comprom
                 <span className="ano-s">{DIAS_SEMANA[sem]}</span>
                 <span className="ano-c">
                   {feriado && <span className="ano-feriado">{feriado}</span>}
+                  {vgs.map((v) => (
+                    <span key={v.id} className={`ano-viagem ${v.tipo === "viagem" ? "inicio" : ""} ${v.status === "pendente" || v.status === "remarcar" ? "pendente" : ""}`} onClick={(e) => e.stopPropagation()}>
+                      {v.hora && <em>{v.hora}</em>}
+                      {v.tipo === "viagem" ? v.emoji : ICONE[v.tipo] || "📌"} {v.titulo}
+                      {v.tipo !== "viagem" && <small>{v.viagem}</small>}
+                    </span>
+                  ))}
                   {itens.map((c) => (
                     <button
                       type="button"
@@ -191,7 +228,7 @@ export default function AgendaAno({ lista, aoMudar, aoVoltar }: { lista: Comprom
           aoFechar={() => setEditando(null)}
           aoSalvar={salvar}
           aoApagar={() => {
-            aoMudar(lista.filter((x) => x.id !== editando.id));
+            aoApagar(editando.id);
             setEditando(null);
           }}
         />

@@ -51,7 +51,7 @@ function escapar(texto: string) {
 }
 
 // Linhas do .ics têm no máximo 75 bytes; as seguintes começam com espaço.
-function dobrar(linha: string) {
+export function dobrar(linha: string) {
   const enc = new TextEncoder();
   const partes: string[] = [];
   let atual = "";
