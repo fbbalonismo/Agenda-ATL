@@ -110,6 +110,8 @@ export function gerarIcs(c: Compromisso, agora = new Date()): string {
     `DTSTART;TZID=${FUSO}:${local(c.data, c.hora)}`,
     `DTEND;TZID=${FUSO}:${somarMinutos(c.data, c.hora, duracao)}`,
     `SUMMARY:${escapar(titulo)}`,
+    "STATUS:CONFIRMED",
+    "TRANSP:OPAQUE",
   ];
   if (c.local?.trim()) linhas.push(`LOCATION:${escapar(c.local.trim())}`);
   if (c.notas?.trim()) linhas.push(`DESCRIPTION:${escapar(c.notas.trim())}`);

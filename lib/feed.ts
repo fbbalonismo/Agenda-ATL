@@ -43,7 +43,7 @@ export function gerarCalendario(lista: Compromisso[], agora = new Date()): strin
     } else {
       linhas.push(`DTSTART;VALUE=DATE:${c.data.replace(/-/g, "")}`, `DTEND;VALUE=DATE:${diaSeguinte(c.data)}`);
     }
-    linhas.push(`SUMMARY:${escapar(titulo)}`);
+    linhas.push(`SUMMARY:${escapar(titulo)}`, "STATUS:CONFIRMED", "TRANSP:OPAQUE");
     if (c.repetir === "ano") linhas.push("RRULE:FREQ=YEARLY");
     if (c.local?.trim()) linhas.push(`LOCATION:${escapar(c.local.trim())}`);
     if (c.observacao?.trim()) linhas.push(`DESCRIPTION:${escapar(c.observacao.trim())}`);
