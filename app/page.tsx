@@ -134,6 +134,8 @@ export default function Pagina() {
   // Calendário assinado no iPhone: depois de assinar, salvar é 1 toque (o iPhone busca sozinho).
   const [assinado, setAssinado] = useState(false);
   const [linkAssin, setLinkAssin] = useState("");
+  const [senhaAssin, setSenhaAssin] = useState("");
+  const [erroAssin, setErroAssin] = useState("");
   const reconhecimento = useRef<Reconhecimento | null>(null);
   const textoFalado = useRef("");
   const pendente = useRef<null | (() => void)>(null);
@@ -428,12 +430,26 @@ export default function Pagina() {
       salvarComp({ id: Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4), titulo: item.titulo, data: item.data, hora: item.hora, local: item.local, observacao: item.observacao, repetir: "" });
   }
 
-  async function pegarLinkAssinatura() {
+  async function pegarLinkAssinatura(s = senhaRef.current) {
+    if (!s) return false;
     try {
-      const r = await fetch("/api/calendario/link", { headers: { "x-senha": senhaRef.current }, cache: "no-store" });
+      const r = await fetch("/api/calendario/link", { headers: { "x-senha": s }, cache: "no-store" });
       const d = await r.json().catch(() => ({}));
-      if (r.ok && d.link) setLinkAssin(d.link);
-    } catch {}
+      if (r.ok && d.link) { setLinkAssin(d.link); setErroAssin(""); return true; }
+      if (r.status === 401) setErroAssin("Senha errada. Use a senha do app (a mesma cadastrada na Vercel como APP_SENHA).");
+    } catch { setErroAssin("Sem internet. Tente de novo."); }
+    return false;
+  }
+  async function entrarParaAssinar() {
+    const s = senhaAssin.trim();
+    if (!s) return;
+    if (await pegarLinkAssinatura(s)) {
+      gravarSenha(s);
+      senhaRef.current = s;
+      setSenha(s);
+      setSenhaAssin("");
+      carregarAgenda(s);
+    }
   }
   useEffect(() => {
     if (sinc === "ligado" && !linkAssin) pegarLinkAssinatura();
@@ -773,7 +789,17 @@ export default function Pagina() {
             </>
           )
         )}
-        {sinc === "ligado" && linkAssin && !assinado && (
+        {!assinado && !linkAssin && (
+          <div className="assinar">
+            <p className="assinar-titulo">Quer salvar com 1 toque só?</p>
+            <p className="dica">Digite a senha do app para liberar o calendário que o iPhone atualiza sozinho.</p>
+            <input id="senha-assin" type="password" autoComplete="current-password" aria-label="Senha do app" value={senhaAssin}
+              onChange={(e) => setSenhaAssin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && entrarParaAssinar()} />
+            {erroAssin && <p className="erro">{erroAssin}</p>}
+            <button type="button" className="principal" onClick={entrarParaAssinar}>Continuar</button>
+          </div>
+        )}
+        {linkAssin && !assinado && (
           <div className="assinar">
             <p className="assinar-titulo">Quer salvar com 1 toque só?</p>
             <p className="dica">Assine o calendário do app no iPhone uma única vez. Depois disso é só tocar em <b>Salvar</b>.</p>
@@ -787,7 +813,7 @@ export default function Pagina() {
             </a>
           </div>
         )}
-        {sinc === "ligado" && assinado && (
+        {assinado && (
           <p className="dica">
             Calendário assinado neste aparelho.{" "}
             <button type="button" className="link-discreto" onClick={() => marcarAssinado(false)}>Voltar ao modo antigo</button>
