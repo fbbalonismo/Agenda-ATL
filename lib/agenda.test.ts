@@ -47,18 +47,20 @@ test("compromisso anual aparece em qualquer ano", () => {
   assert.equal(porDia([c], 2030)["2030-10-20"]?.[0].titulo, "Aniversário");
 });
 
-import { lerLigacao } from "./agenda.ts";
+import { lerAtalho } from "./agenda.ts";
 
-test("GILMARA 14 vira ligar para Gilmara hoje às 14:00", () => {
-  assert.deepEqual(lerLigacao("GILMARA 14", "2026-11-23"), { titulo: "Ligar para Gilmara", data: "2026-11-23", hora: "14:00", repetir: "" });
-  assert.equal(lerLigacao("gilmara 9h30", "2026-11-23")?.hora, "09:30");
-  assert.equal(lerLigacao("Ligar para Dr Paulo 16:15", "2026-11-23")?.titulo, "Ligar para Dr Paulo");
-  assert.equal(lerLigacao("João às 8", "2026-11-23")?.hora, "08:00");
+test("palavra + hora vira compromisso de hoje com o título digitado", () => {
+  assert.deepEqual(lerAtalho("Gilmara 14", "2026-11-23"), { titulo: "Gilmara", data: "2026-11-23", hora: "14:00", repetir: "" });
+  assert.equal(lerAtalho("barbeiro 9h30", "2026-11-23")?.titulo, "Barbeiro");
+  assert.equal(lerAtalho("barbeiro 9h30", "2026-11-23")?.hora, "09:30");
+  assert.equal(lerAtalho("GILMARA 14", "2026-11-23")?.titulo, "GILMARA");
+  assert.equal(lerAtalho("Dentista às 8", "2026-11-23")?.hora, "08:00");
+  assert.equal(lerAtalho("Dr. Paulo 16:15", "2026-11-23")?.titulo, "Dr. Paulo");
 });
 
-test("não confunde compromisso comum com ligação", () => {
-  assert.equal(lerLigacao("dentista 14", "2026-11-23"), null);
-  assert.equal(lerLigacao("reunião 10h", "2026-11-23"), null);
-  assert.equal(lerLigacao("Gilmara 25", "2026-11-23"), null);
-  assert.equal(lerLigacao("jantar com Gilmara dia 20 às 20h", "2026-11-23"), null);
+test("datas e horas inválidas ficam fora do atalho", () => {
+  assert.equal(lerAtalho("amanhã 14", "2026-11-23"), null);
+  assert.equal(lerAtalho("sexta 10", "2026-11-23"), null);
+  assert.equal(lerAtalho("Gilmara 25", "2026-11-23"), null);
+  assert.equal(lerAtalho("jantar com Gilmara dia 20 às 20h", "2026-11-23"), null);
 });

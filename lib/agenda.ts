@@ -75,27 +75,24 @@ const HORA_RE = /\b(?:as\s+)?(\d{1,2})(?:[:h](\d{2})(?:\s*h)?|\s*(?:h|horas))(?!
 const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 // "aniversário André 20 de outubro", "jantar 05/12 às 20h", "reunião amanhã 10:30", "churrasco no sábado 13h"
-// Atalho de ligação (pedido do André em 2026-11-23): "GILMARA 14" = ligar para Gilmara hoje às 14:00.
-// Só vale para "nome + hora" (até 3 palavras, opcionalmente começando com "ligar/ligar para"). Palavras de compromisso
-// comuns ("dentista 14", "reunião 10") não viram ligação.
-const NAO_E_NOME = new Set(["dentista", "medico", "medica", "reuniao", "jantar", "almoco", "cafe", "consulta", "exame", "academia", "aula",
-  "voo", "missa", "culto", "festa", "aniversario", "churrasco", "treino", "pilates", "fisioterapia", "fisio", "terapia", "cabeleireiro",
-  "manicure", "banco", "mercado", "supermercado", "farmacia", "escola", "trabalho", "hoje", "amanha", "dia", "as", "reuniao"]);
-export function lerLigacao(frase: string, hoje: string): { titulo: string; data: string; hora: string; repetir: "" } | null {
+// Atalho "palavra + hora" (pedido do André em 2026-11-23): "Gilmara 14", "Barbeiro 9h30" = compromisso HOJE nesse horário,
+// com o título exatamente como foi digitado (só a primeira letra maiúscula). Até 4 palavras. Palavras de data
+// ("amanhã 14", "sexta 10") não entram aqui: seguem a leitura normal de datas.
+const PALAVRAS_DE_DATA = new Set(["hoje", "amanha", "depois", "dia", "as", "no", "na", "domingo", "segunda", "terca", "quarta", "quinta",
+  "sexta", "sabado", "janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]);
+export function lerAtalho(frase: string, hoje: string): { titulo: string; data: string; hora: string; repetir: "" } | null {
   const t = String(frase || "").trim().replace(/\s+/g, " ").replace(/\s+(?:às|as)\s+(?=\d)/i, " ");
-  const m = t.match(/^(?:ligar(?:\s+(?:para|pra|p\/))?\s+)?([A-Za-zÀ-ÿ]+(?:\s+[A-Za-zÀ-ÿ]+){0,2})\s+(?:às\s+|as\s+)?(\d{1,2})(?:\s*(?:h|:)\s*(\d{2})?|\s*h)?$/i);
+  const m = t.match(/^([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ.'-]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ.'-]*){0,3})\s+(\d{1,2})(?:\s*(?:h|:)\s*(\d{2})?|\s*h)?$/i);
   if (!m) return null;
-  const palavras = m[1].split(" ");
-  if (palavras.some((p) => NAO_E_NOME.has(semAcento(p.toLowerCase())))) return null;
+  if (m[1].split(" ").some((p) => PALAVRAS_DE_DATA.has(semAcento(p.toLowerCase()).replace(/[.'-]/g, "")))) return null;
   const hh = +m[2], mm = +(m[3] || 0);
   if (hh > 23 || mm > 59) return null;
-  const nome = palavras.map((p) => p[0].toUpperCase() + p.slice(1).toLowerCase()).join(" ");
-  return { titulo: `Ligar para ${nome}`, data: hoje, hora: `${dois(hh)}:${dois(mm)}`, repetir: "" };
+  return { titulo: m[1][0].toUpperCase() + m[1].slice(1), data: hoje, hora: `${dois(hh)}:${dois(mm)}`, repetir: "" };
 }
 
 export function lerFrase(frase: string, hoje: string): { titulo: string; data: string; hora: string; repetir: "" | "ano" } | null {
-  const ligacao = lerLigacao(frase, hoje);
-  if (ligacao) return ligacao;
+  const atalho = lerAtalho(frase, hoje);
+  if (atalho) return atalho;
   const t = ` ${String(frase || "").trim()} `;
   const n = semAcento(t); // mesmo comprimento de t (só tira acentos de letras pré-compostas)
   const dataHoje = deIso(hoje);
