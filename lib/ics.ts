@@ -46,7 +46,7 @@ export function validar(c: Compromisso): string | null {
   return null;
 }
 
-function escapar(texto: string) {
+export function escapar(texto: string) {
   return texto.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 }
 
@@ -71,11 +71,11 @@ export function dobrar(linha: string) {
   return partes.join("\r\n ");
 }
 
-function local(data: string, hora: string) {
+export function local(data: string, hora: string) {
   return `${data.replace(/-/g, "")}T${hora.replace(":", "")}00`;
 }
 
-function somarMinutos(data: string, hora: string, minutos: number) {
+export function somarMinutos(data: string, hora: string, minutos: number) {
   const [a, mes, d] = data.split("-").map(Number);
   const [h, m] = hora.split(":").map(Number);
   const t = new Date(Date.UTC(a, mes - 1, d, h, m + minutos));

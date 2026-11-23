@@ -131,6 +131,9 @@ export default function Pagina() {
   const [viagens, setViagens] = useState<ItemViagem[]>([]);
   const [sinc, setSinc] = useState<"local" | "ligado" | "senha" | "erro">("local");
   const [senhaAno, setSenhaAno] = useState("");
+  // Calendário assinado no iPhone: depois de assinar, salvar é 1 toque (o iPhone busca sozinho).
+  const [assinado, setAssinado] = useState(false);
+  const [linkAssin, setLinkAssin] = useState("");
   const reconhecimento = useRef<Reconhecimento | null>(null);
   const textoFalado = useRef("");
   const pendente = useRef<null | (() => void)>(null);
@@ -140,6 +143,7 @@ export default function Pagina() {
 
   useEffect(() => {
     setAnoLista(lerAno());
+    try { setAssinado(localStorage.getItem("agenda-assinado") === "1"); } catch {}
     const ver = new URLSearchParams(window.location.search).get("ver");
     if (ver === "ano" || ver === "semana") setVerAno(ver);
     const s = lerSenha();
@@ -424,6 +428,23 @@ export default function Pagina() {
       salvarComp({ id: Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4), titulo: item.titulo, data: item.data, hora: item.hora, local: item.local, observacao: item.observacao, repetir: "" });
   }
 
+  async function pegarLinkAssinatura() {
+    try {
+      const r = await fetch("/api/calendario/link", { headers: { "x-senha": senhaRef.current }, cache: "no-store" });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.link) setLinkAssin(d.link);
+    } catch {}
+  }
+  useEffect(() => {
+    if (sinc === "ligado" && !linkAssin) pegarLinkAssinatura();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sinc]);
+  function marcarAssinado(v: boolean) {
+    setAssinado(v);
+    try { if (v) localStorage.setItem("agenda-assinado", "1"); else localStorage.removeItem("agenda-assinado"); } catch {}
+  }
+  const umToque = assinado && sinc === "ligado";
+
   function proximo() {
     const falta = achados.find((a) => !salvos.some((s) => mesmo(s, a)) && !mesmo(a, item));
     if (falta) {
@@ -703,14 +724,26 @@ export default function Pagina() {
         {adicionado ? (
           <div className="festa">
             <Festa className="festa-ilu" />
-            <p className="festa-titulo">Prontinho!</p>
-            <p className="dica">
-              Na tela que abriu, toque em <b>Adicionar</b>. Depois confira no app Calendário.
-            </p>
+            <p className="festa-titulo">{umToque ? "Salvo!" : "Prontinho!"}</p>
+            {umToque ? (
+              <p className="dica">
+                Entra sozinho no Calendário do iPhone, com os avisos, em até 15 minutos. Também já está no <b>Meu ano</b>.
+              </p>
+            ) : (
+              <p className="dica">
+                Na tela que abriu, toque em <b>Adicionar</b>. Depois confira no app Calendário.
+              </p>
+            )}
             <div className="festa-botoes">
-              <a className="secundario" href={linkCalendario} onClick={salvar}>
-                Abrir de novo
-              </a>
+              {umToque ? (
+                <button type="button" className="secundario" onClick={() => setAdicionado(false)}>
+                  Corrigir
+                </button>
+              ) : (
+                <a className="secundario" href={linkCalendario} onClick={salvar}>
+                  Abrir de novo
+                </a>
+              )}
               <button type="button" className="principal" onClick={proximo}>
                 {faltam ? `Próximo compromisso (${faltam})` : "Agendar outro"}
               </button>
@@ -719,14 +752,46 @@ export default function Pagina() {
         ) : problema ? (
           <p className="dica">{problema}</p>
         ) : (
-          <>
-            <a className="principal grande" href={linkCalendario} onClick={salvar}>
-              <CalendarioOk className="botao-ico" /> Adicionar ao Calendário
+          umToque ? (
+            <>
+              <button type="button" className="principal grande" onClick={salvar}>
+                <CalendarioOk className="botao-ico" /> Salvar
+              </button>
+              <p className="dica">
+                Um toque e pronto: vai para o Calendário do iPhone sozinho.{" "}
+                <a className="link-discreto" href={linkCalendario}>Prefere baixar o arquivo?</a>
+              </p>
+            </>
+          ) : (
+            <>
+              <a className="principal grande" href={linkCalendario} onClick={salvar}>
+                <CalendarioOk className="botao-ico" /> Adicionar ao Calendário
+              </a>
+              <p className="dica">
+                No iPhone abre uma tela do Calendário: toque em <b>Adicionar</b>. No computador, abra o arquivo baixado.
+              </p>
+            </>
+          )
+        )}
+        {sinc === "ligado" && linkAssin && !assinado && (
+          <div className="assinar">
+            <p className="assinar-titulo">Quer salvar com 1 toque só?</p>
+            <p className="dica">Assine o calendário do app no iPhone uma única vez. Depois disso é só tocar em <b>Salvar</b>.</p>
+            <ol>
+              <li>Toque no botão abaixo e depois em <b>Assinar</b>.</li>
+              <li>Na tela seguinte, deixe <b>Remover Alertas</b> DESLIGADO (senão os avisos somem) e toque em <b>Adicionar</b>.</li>
+              <li>Em <b>Ajustes → Calendário → Contas → Buscar Novos Dados</b>, escolha <b>A cada 15 minutos</b>.</li>
+            </ol>
+            <a className="principal" href={linkAssin} onClick={() => marcarAssinado(true)}>
+              📅 Assinar o calendário no iPhone
             </a>
-            <p className="dica">
-              No iPhone abre uma tela do Calendário: toque em <b>Adicionar</b>. No computador, abra o arquivo baixado.
-            </p>
-          </>
+          </div>
+        )}
+        {sinc === "ligado" && assinado && (
+          <p className="dica">
+            Calendário assinado neste aparelho.{" "}
+            <button type="button" className="link-discreto" onClick={() => marcarAssinado(false)}>Voltar ao modo antigo</button>
+          </p>
         )}
       </section>
 

@@ -38,3 +38,10 @@ com aviso na tela e link para a semana.
 - `npm run build` — checagem completa
 
 Deploy automático: todo push na `main` publica na Vercel.
+
+## Salvar com 1 toque (calendário assinado)
+
+O iPhone exige confirmar cada arquivo .ics importado (3 toques). Para evitar isso, o app oferece um calendário assinado:
+`/api/calendario?k=<chave>` gera todos os compromissos (os `events` do banco compartilhado) com os avisos. A chave é derivada da
+`APP_SENHA` (`lib/feed.ts`) e o link sai de `/api/calendario/link` (exige a senha). Trocar a senha troca o link.
+Depois de assinar, o botão vira **Salvar** (grava no banco; o iPhone busca sozinho a cada 15 min). No iPhone, "Remover Alertas" precisa ficar desligado.
