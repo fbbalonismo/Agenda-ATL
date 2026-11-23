@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { calcularAvisos, validar } from "@/lib/ics";
 import { Arquivos, CalendarioOk, Festa, Hero, Lapis, Lupa, Microfone, Sino, Sol, Vazio } from "@/components/Ilustracoes";
 import AgendaAno from "@/components/AgendaAno";
-import type { Compromisso } from "@/lib/agenda";
+import { hojeEmBrasilia, lerLigacao, type Compromisso } from "@/lib/agenda";
 import type { ItemViagem } from "@/lib/sync";
 
 type Item = { titulo: string; data: string; hora: string; local: string; observacao: string };
@@ -225,6 +225,15 @@ export default function Pagina() {
   function lerTexto(t = texto) {
     if (!t.trim()) {
       setErro("Escreva ou fale o compromisso primeiro.");
+      return;
+    }
+    // "GILMARA 14" = ligar para Gilmara hoje às 14:00 (lido no próprio app, sem IA)
+    const lig = lerLigacao(t, hojeEmBrasilia());
+    if (lig) {
+      comecar();
+      const agora = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+      mostrarResultado([{ titulo: lig.titulo, data: lig.data, hora: lig.hora, local: "", observacao: "" }],
+        [lig.hora <= agora ? `Esse horário (${lig.hora}) já passou hoje. Se for para amanhã, mude o Dia.` : ""]);
       return;
     }
     exigirSenha(async () => {
